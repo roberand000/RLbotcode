@@ -20,7 +20,6 @@ class jumper():
         if agent.time % 5 == 0:
             agent.controller.jump = True
 
-
 class drive(Routine):
     def __init__(self, speed, target=None) -> None:
         self.speed = speed
@@ -158,6 +157,37 @@ class aerial_shot(Routine):
 
 
 class flip(Routine):
+    # Flip takes a vector in local coordinates and flips/dodges in that direction
+    # cancel causes the flip to cancel halfway through, which can be used to half-flip
+    def __init__(self, vector: Vector3, cancel=False):
+        self.vector = vector.normalize()
+        self.pitch = abs(self.vector[0]) * -sign(self.vector[0])
+        self.yaw = abs(self.vector[1]) * sign(self.vector[1])
+        self.cancel = cancel
+        # the time the jump began
+        self.time = -1
+        # keeps track of the frames the jump button has been released
+        self.counter = 0
+
+    def run(self, agent):
+        if self.time == -1:
+            elapsed = 0
+            self.time = agent.time
+        else:
+            elapsed = agent.time - self.time
+        if elapsed < 0.15:
+            agent.controller.jump = True
+        elif elapsed >= 0.15 and self.counter < 3:
+            agent.controller.jump = False
+            self.counter += 1
+        elif elapsed < 0.3 or (not self.cancel and elapsed < 0.9):
+            agent.controller.jump = True
+            agent.controller.pitch = self.pitch
+            agent.controller.yaw = self.yaw
+        else:
+            agent.set_intent(recovery())
+
+class dodge(Routine):
     # Flip takes a vector in local coordinates and flips/dodges in that direction
     # cancel causes the flip to cancel halfway through, which can be used to half-flip
     def __init__(self, vector: Vector3, cancel=False):
@@ -422,6 +452,18 @@ class kickoff(Routine):
             agent.set_intent(
                 flip(agent.me.local(agent.foe_goal.location - agent.me.location)))
 
+class kickoff2(Routine):
+    # A simple 1v1 kickoff that just drives up behind the ball and dodges
+    # misses the boost on the slight-offcenter kickoffs haha
+    def run(self, agent):
+        target = agent.ball.location + Vector3(0, 200*side(agent.team), 0)
+        local_target = agent.me.local(target - agent.me.location)
+        defaultPD(agent, local_target)
+        defaultThrottle(agent, 2300)
+        if local_target.magnitude() < 650:
+            # flip towards opponent goal
+            agent.set_intent(
+                flip(agent.me.local(agent.foe_goal.location - agent.me.location)))
 
 class recovery(Routine):
     # Point towards our velocity vector and land upright, unless we aren't moving very fast

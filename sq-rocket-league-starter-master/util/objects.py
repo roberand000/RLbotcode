@@ -123,9 +123,45 @@ class BotCommandAgent(BaseAgent):
         # send our updated controller back to rlbot
         return self.controller
 
+    def get_closest_large_boost(self):
+        avalible_boosts = [boost for boost in self.boosts if boost.large and boost.active]
+        closest_boost = None
+        closest_distance = 10000
+        for boost in avalible_boosts:
+            distance = (self.me.location - boost.location).magnitude()
+            if closest_boost is None or distance < closest_distance:
+                closest_boost = boost
+                closest_distance = distance
+        return closest_boost
+
+    def is_in_front_of_ball(self):
+        me_to_goal = abs(self.me.location.y - self.foe_goal.location.y)
+        ball_to_goal = abs(self.ball.location.y - self.foe_goal.location.y)
+        in_front_of_ball = me_to_goal > ball_to_goal
+        if me_to_goal < ball_to_goal + 1000:
+            return True
+        return False
+    
+    def is_not_in_front_of_ball(self):
+        me_to_goal = abs(self.me.location.y - self.foe_goal.location.y)
+        ball_to_goal = abs(self.ball.location.y - self.foe_goal.location.y)
+        not_in_front_of_ball = me_to_goal > ball_to_goal
+        if me_to_goal > ball_to_goal + 1000:
+            return True
+        return False
+
     def run(self):
         # override this with your strategy code
         pass
+    
+    def is_opponent_threatening(self):
+        for foe in self.foes:
+            if foe.location.le(self.friend_goal.location) < 100:  # Example threshold
+                return True
+        return False
+    
+    def evaluate_boost_priority(self, boosts):
+        return sorted(boosts, key=lambda b: b.location.distance(self.me.location) / max(1, self.me.boost))
 
 class car_object:
     # The carObject, and kin, convert the gametickpacket in something a little friendlier to use,
@@ -435,3 +471,7 @@ class Vector3:
         if start.dot(s) < end.dot(s):
             return end
         return start
+    
+    
+
+
